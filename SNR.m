@@ -1,5 +1,5 @@
-Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\10-SNR\';
-flienameRegx = 'j=*_SNR_D=*.csv';
+Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\18-SNR\';
+flienameRegx = 'PSD_GS=*_count=*.csv';
 filelist = dir([Directory,flienameRegx]);
 
 
@@ -10,9 +10,11 @@ peakSearchRange = [peakF-span/2, peakF+span/2];
 
 data = importdata([filelist(1).folder,'\',filelist(1).name]);
 data = data.data;
-data(:,1) = data(:,1);
+
 f = data(:,1);
-p = data(:,2);
+pA = data(:,2);
+pB = data(:,3);
+pC = data(:,4);
 [~,Indexs(1)] = min(abs(f-noiFloorSampleRange(1)));
 [~,Indexs(2)] = min(abs(f-noiFloorSampleRange(2)));
 [~,PeakIndexs(1)] = min(abs(f-peakSearchRange(1)));
@@ -31,7 +33,6 @@ gapSize = [];
 
 data = importdata([Directory,'DN.csv']);
 data = data.data;
-data(:,1) = data(:,1);
 f = data(:,1);
 p = data(:,2);
 [~,a] = min(abs(f-noiFloorSampleRange(1)));

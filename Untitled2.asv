@@ -4,7 +4,7 @@ filelist = dir([Directory,flienameRegx]);
 [~,index] = sortrows({filelist.date}.');
 filelist = filelist(index); 
 clear index;
-avg = 1000;
+avg = 6;
 gapsizes = [];
 for i =1:size(filelist,1)
     temp = regexp(filelist(i).name, 'TS_GS=([0-9]+\.[0-9]*)_count=([0-9]+)\.csv', 'tokens');
@@ -29,7 +29,7 @@ for j = 1:length(fileidx)
         temp = regexp(filelist(i).name, 'TS_GS=([0-9]+\.[0-9]*)_count=([0-9]+)\.csv', 'tokens');
         data = importdata([filelist(i).folder,'\',filelist(i).name]);
         data = data.data;
-        VC = data(:,3)
+        VC = data(:,4)
         power(i) = mean(VC);
     end
     powers(j) = mean(power);
