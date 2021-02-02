@@ -1,16 +1,26 @@
-data = importdata([filelist(1).folder,'\',filelist(1).name]);
-data = data.data;
-checkrange = [12000, 500000];
-[~,i1] = min(abs(f-checkrange(1)));
-[~,i2] = min(abs(f-checkrange(2)));
-for p = 0.98:0.005:1.03
-    VA = data(:,2);
-    VB = data(:,3);
-    %VC = data(:,4);
-    [psd, f] = periodogram(VA-VB, rectwin(length(VA)), length(VA), 1/(data(2,1)-data(1,1)));
-    [psdC, f] = periodogram(VC, rectwin(length(VC)), length(VC), 1/(data(2,1)-data(1,1)));
-    [~,i1] = min(abs(f-checkrange(1)));
-    [~,i2] = min(abs(f-checkrange(2)));
-    plot(f(i1:i2),10*log10(psd(i1:i2)*20));
-    waitforbuttonpress;
+Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\20-SNR\';
+flienameRegx = 'TS_GS=*_count=*.bin';
+filelist = dir([Directory,flienameRegx]);
+[~,index] = sortrows({filelist.date}.');
+filelist = filelist(index); 
+clear index;
+rate = 1e8/6.4;
+
+checkrange = [110e3, 130e3];
+psds = cell(1, 100);
+parfor i = 1:100
+    fileID = fopen([filelist(i).folder,'\',filelist(i).name]);
+    data = fread(fileID, [3,inf], 'double');
+    data = data';
+    VA = data(:,1)*pypbests(i);
+    VB = data(:,2)*(2-pypbests(i));
+    [newpsd, f] = periodogram(VA-VB, rectwin(length(VA)), length(VA), rate);
+    psds{i} = newpsd;
+    fclose(fileID);
 end
+
+pypsd = zeros(size(psds{1}));
+for i = 1:100
+    pypsd = pypsd+psds{i};
+end
+pypsd = 10*log10(20*pypsd/100);

@@ -1,8 +1,8 @@
 function pbest = PDdualAC_balance(data)
     VC = data(:,3);
     rate = 1e8/6.4;
-    inspectF = 400000;
-    span = 400000;
+    inspectF = 122000;
+    span = 20000;
 
     [psdC,f] = periodogram(VC, rectwin(length(VC)), length(VC), rate);
     [~,i1] = min(abs(f-inspectF+span));

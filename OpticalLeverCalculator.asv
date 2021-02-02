@@ -56,7 +56,7 @@ plot(noiFloorC*0.14./peakHeightC);
 
 clear ans d f GeomNoise re SNR SPF wx y DN
 clear global
-ds = ds/w(w0x, L);
+ds = ds/
 %plot(freq(check1:check2-1), PSD(check1:check2-1), samplepoints-8.515, PSD_theory')
 
 function re = SNRc(omega, theta, d)
