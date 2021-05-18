@@ -1,5 +1,4 @@
-Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\49-SNR\';
-experienceLOC = 26;
+Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\53-SNR\';
 
 cPowerFlienameRegx = 'cPower_GS=*.bin';
 cPowerFilelist = dir([Directory,cPowerFlienameRegx]);
@@ -41,7 +40,7 @@ fileID = fopen([Directory, 'PSDfreq.bin']);
 freq = fread(fileID, 'double');
 fclose(fileID);
 
-fileID = fopen([Directory, 'DN_new.bin']);
+fileID = fopen([Directory, 'DN.bin']);
 DN = fread(fileID, 'double');
 fclose(fileID);
 
@@ -49,11 +48,15 @@ info = jsondecode(fileread([Directory,'info.json']));
 
 peakF = 122037;
 span = 500;
+%peakF = 142980;
+%span = 500;
+noiFloorSampleRange = [113000, 116000];
+%noiFloorSampleRange = [152000, 155000];
+
 peakSearchRange = [peakF-span/2, peakF+span/2];
 [~,PI1] = min(abs(freq-peakSearchRange(1)));
 [~,PI2] = min(abs(freq-peakSearchRange(2)));
 
-noiFloorSampleRange = [113000, 116000];
 [~,NI1] = min(abs(freq-noiFloorSampleRange(1)));
 [~,NI2] = min(abs(freq-noiFloorSampleRange(2)));
 
@@ -68,7 +71,6 @@ end
 avg = 1000;
 cPowers = zeros(1, steps);
 for i =1:steps
-    temp = regexp(cPowerFilelist(i).name, 'cPower_GS=([0-9]+\.[0-9]*)\.bin', 'tokens');
     fileID = fopen([cPowerFilelist(i).folder,'\',cPowerFilelist(i).name]);
     data = fread(fileID, 'double');
     cPowers(i) = mean(data);
@@ -76,12 +78,18 @@ for i =1:steps
 end
 
 powers = zeros(1, steps);
+n_powers = zeros(1, steps);
 for i =1:steps
-    temp = regexp(powerFilelist(i).name, 'power_GS=([0-9]+\.[0-9]*)\.bin', 'tokens');
     fileID = fopen([powerFilelist(i).folder,'\',powerFilelist(i).name]);
     data = fread(fileID, 'double');
-    powers(i) = mean(data);
     fclose(fileID);
+    
+    fileID = fopen([cPowerFilelist(i).folder,'\',cPowerFilelist(i).name]);
+    data2 = fread(fileID, 'double');
+    fclose(fileID);
+    
+    powers(i) = mean(data);
+    n_powers(i) = mean(data./data2)*mean(cPowers);
 end
 
 
@@ -127,19 +135,27 @@ SNR_std = sqrt((1./nois).^2.*height_stds.^2 + (heights./nois.^2).^2.*noi_stds.^2
 gapsizes = max(gapsizes)-gapsizes;
 
 % fit
-Axfit = erfFit(info.MirrorA.positions.value, powers, info.MirrorA.angle.value, info.Mirror_tilt_angle.value, 6.3*1.68);
-GSfit_A = 2*(Axfit.x0*1e3-info.MirrorA.positions.value)*sin(info.MirrorA.angle.value)*cos(info.Mirror_tilt_angle.value);
-GSfit_A_overW = GSfit_A/Axfit.wx*1e-3;
+fitMirror = 'A';
+if fitMirror == 'A'
+    Axfit = erfFit(info.MirrorA.positions.value, n_powers, info.MirrorA.angle.value, info.Mirror_tilt_angle.value, 7.3*1.5*1.64, fitMirror);
+    GSfit = 2*(Axfit.x0*1e3-info.MirrorA.positions.value)*sin(info.MirrorA.angle.value)*cos(info.Mirror_tilt_angle.value);
+    %GSfit = 2*(8.67-info.MirrorA.positions.value)*sin(info.MirrorA.angle.value)*cos(info.Mirror_tilt_angle.value);
+    GSfit_overW = GSfit/Axfit.wx*1e-3;
+else
+    Bxfit = erfFit(info.MirrorB.positions.value, n_powers, info.MirrorB.angle.value, info.Mirror_tilt_angle.value, 7.3*1.5*1.64, fitMirror);
+    GSfit = 2*(Bxfit.x0*1e3-info.MirrorB.positions.value)*sin(info.MirrorB.angle.value)*cos(info.Mirror_tilt_angle.value);
+    GSfit_overW = GSfit/Bxfit.wx*1e-3;
+end
 
 %plot
-[~,cut] = min(abs(ds-GSfit_A_overW(end)));
-cut = cut+1;
-noi_offset = -0.45;
-height_offset = 2.1;
+[~,cut] = min(abs(ds-GSfit_overW(end)));
+%cut = cut+1;
+noi_offset = -2;
+height_offset = 2;
 
 subplot(2,3,1);
 height_logstds = 10*height_stds./(log(10)*heights);
-errorbar(GSfit_A_overW, 10*log10(20*heights), height_logstds,'.');
+errorbar(GSfit_overW, 10*log10(20*heights), height_logstds,'.');
 hold on;
 plot(ds(1:cut), 10*log10(20*peakHeightC(1:cut)));
 title('Subplot 1: Peak area');
@@ -148,7 +164,7 @@ ylabel('Power(mdB)')
 
 subplot(2,3,2);
 noi_logstds = 10*noi_stds./(log(10)*nois);
-errorbar(GSfit_A_overW, 10*log10(20*nois), noi_logstds, '.');
+errorbar(GSfit_overW, 10*log10(20*nois), noi_logstds, '.');
 hold on;
 plot(ds(1:cut), 10*log10(20*noiFloorC(1:cut)));
 title('Subplot 2: Shot noise');
@@ -156,7 +172,7 @@ xlabel('Gapsize/beamWaist')
 ylabel('Power(mdB)')
 
 subplot(2,3,3);
-errorbar(GSfit_A_overW, 10*log10(20*SNR), sqrt(noi_logstds.^2+height_logstds.^2),'.');
+errorbar(GSfit_overW, 10*log10(20*SNR), sqrt(noi_logstds.^2+height_logstds.^2),'.');
 hold on;
 plot(ds(1:cut), 10*log10(20*peakHeightC(1:cut)./noiFloorC(1:cut)));
 title('Subplot 3: SNR');
@@ -165,7 +181,7 @@ ylabel('Power(mdB)')
 
 subplot(2,3,4);
 height_logstds = 10*height_stds./(log(10)*heights);
-errorbar(GSfit_A_overW, 10*log10(20*heights)+height_offset, height_logstds,'.');
+errorbar(GSfit_overW, 10*log10(20*heights)+height_offset, height_logstds,'.');
 hold on;
 plot(ds(1:cut), 10*log10(20*peakHeightC(1:cut)));
 title(sprintf('Subplot 4: Peak area, offseted by %0.2f dB', height_offset));
@@ -174,7 +190,7 @@ ylabel('Power(mdB)')
 
 subplot(2,3,5);
 noi_logstds = 10*noi_stds./(log(10)*nois);
-errorbar(GSfit_A_overW, 10*log10(20*nois)+noi_offset, noi_logstds, '.');
+errorbar(GSfit_overW, 10*log10(20*nois)+noi_offset, noi_logstds, '.');
 hold on;
 plot(ds(1:cut), 10*log10(20*noiFloorC(1:cut)));
 title(sprintf('Subplot 5: Shot Noise, offseted by %0.2f dB', noi_offset));
@@ -182,7 +198,7 @@ xlabel('Gapsize/beamWaist')
 ylabel('Power(mdB)')
 
 subplot(2,3,6);
-errorbar(GSfit_A_overW, 10*log10(20*SNR)+height_offset-noi_offset, sqrt(noi_logstds.^2+height_logstds.^2),'.');
+errorbar(GSfit_overW, 10*log10(20*SNR)+height_offset-noi_offset, sqrt(noi_logstds.^2+height_logstds.^2),'.');
 hold on;
 plot(ds(1:cut), 10*log10(20*peakHeightC(1:cut)./noiFloorC(1:cut)));
 title(sprintf('Subplot 6: SNR, offseted by %0.2f dB', height_offset-noi_offset));

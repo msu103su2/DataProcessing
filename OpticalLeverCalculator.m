@@ -1,18 +1,18 @@
 global L w0x w0y lamda omegaM Gamma meff rho a b h bw P WtoV km k T kb hbar c SthFF Responsitivity PDGain
-L = 55e-3;
-w0x = 15e-6;
-w0y = 15e-6;
+L = 200e-3;
+w0x = 60e-6;
+w0y = 60e-6;
 lamda = 1064e-9;
-omegaM = 122037*2*pi;
-Gamma = 130.71;
+omegaM = 182194*2*pi;
+Gamma = 5;
 rho = 3100;
 a = 1.5e-3;
 b = 3.5e-3;
 h = 100e-9;
-bw =8.515;
-P = 1680e-6;
-Responsitivity = 0.63;
-PDGain = 1e4;
+bw =1;
+P = 1730e-6;
+Responsitivity = 0.5;
+PDGain = 300e3;
 WtoV = Responsitivity*PDGain;
 T = 300;
 kb = 1.38064852e-23;
@@ -29,7 +29,6 @@ wx = w(w0x,L);
 ds = 0:wx/20:3*wx;
 peakHeightC = zeros(1, length(ds));
 noiFloorC = zeros(1, length(ds));
-DN = -110;
 samplepoints = [omegaM - 2*pi*5*bw:2*pi*bw:omegaM + 2*pi*5*bw];
 
 %{
@@ -51,12 +50,9 @@ for i = 1 : length(ds)
     toc 
 end
 plot(noiFloorC*0.14./peakHeightC);
-%peakHeightC = 10*log10(10.^(peakHeightC/10)+10^(DN/10));
-%noiFloorC = 10*log10(10.^(noiFloorC/10)+10^(DN/10));
-
+ds = ds/w(w0x, L);
 clear ans d f GeomNoise re SNR SPF wx y DN
 clear global
-ds = ds/w(w0x, L);
 %plot(freq(check1:check2-1), PSD(check1:check2-1), samplepoints-8.515, PSD_theory')
 
 function re = SNRc(omega, theta, d)
