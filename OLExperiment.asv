@@ -38,9 +38,27 @@ classdef OLExperiment < handle
             obj.sp.d = oldd;
         end
         
+        function re = CalFmn(obj, spdx, d, m, n)
+            HGB = HGBeam(m, n, obj.laser.lambda, obj.w0, obj.w0);
+            wz = HGB.wx(obj.lenf);
+            oldoffset = obj.sp.offset;
+            oldd = obj.sp.d;
+            
+            obj.sp.offset = spdx/wz*obj.w0;
+            obj.sp.d = d/wz*obj.w0;
+            re = obj.sp.F_onlyx(HGB);
+            obj.sp.offset = oldoffset;
+            obj.sp.d = oldd;
+        end
+        
         function re = CMcor(obj, dx, theta)           
-            re = (obj.F0 + 2*obj.F1*dx/obj.w0*cos(theta)) - ...
+            re = (obj.F0 + 2*obj.F1*dx/obj.w0*cos(theta)) + ...
                 2*obj.laser.Pdc*obj.F1*(obj.device.kmx())^2*obj.laser.k*obj.w0*dx/obj.consts.c*obj.device.response(obj.f)*sin(theta);
+            re = abs(re).^2;
+        end
+        
+        function re = CMcor_chi(obj, dx, theta)           
+            re = 2*obj.laser.Pdc*obj.F1*(obj.device.kmx())^2*obj.laser.k*obj.w0*dx/obj.consts.c*obj.device.response(obj.f)*sin(theta);
             re = abs(re).^2;
         end
         
@@ -57,13 +75,17 @@ classdef OLExperiment < handle
                 *(sin(theta)*obj.F1*obj.laser.k*obj.device.kmx()*obj.w0)^2*abs(obj.device.response(obj.f)).^2;
         end
         
-        function [total, signal, noise] = CalSig_chirp(obj, dx, theta)
+        function [total, signal, noise, signal_chi, thermal, Qnoi] = CalSig_chirp(obj, dx, theta)
             %assuming laser psd is only composed of a dc and some spectrum
             %around device.fm, whose amplitude is descripbed by Pac in time
             %domain
-            signal = obj.CMcor(dx, theta)*obj.laser.Pac^2/(2*obj.laser.deltaf);
-            noise = obj.thermal(theta)*obj.laser.Pdc^2 + obj.Qnoi(theta);
-            total = signal + noise;  
+            signal = obj.CMcor(dx, theta)*obj.laser.Pac^2/(4*obj.laser.deltaf);
+            signal_chi = obj.CMcor_chi(dx, theta)*obj.laser.Pac^2/(4*obj.laser.deltaf);  
+            
+            thermal = obj.thermal(theta)*obj.laser.Pdc^2;
+            Qnoi = obj.Qnoi(theta);
+            noise = thermal + Qnoi;
+            total = signal + noise;    
         end
         
         function re = WtoA(obj, psd)
@@ -71,7 +93,7 @@ classdef OLExperiment < handle
         end
         
         function re = AtoV(obj, psd)
-            re = psd*(obj.PD.Gain*1e3)^2;
+            re = psd*(obj.PD.Gain)^2;
         end
         
         function re = MiscConversion(obj, psd)
@@ -82,11 +104,14 @@ classdef OLExperiment < handle
             re = obj.MiscConversion(obj.AtoV(obj.WtoA(psd)));
         end
         
-        function [total, signal, noise] = GetPSDs(obj, dx, theta)
-            [total, signal, noise] = obj.CalSig_chirp(dx, theta);
+        function [total, signal, noise, signal_chi, thermal, sideband] = GetPSDs(obj, dx, theta)
+            [total, signal, noise, signal_chi, thermal, Qnoi] = obj.CalSig_chirp(dx, theta);
             total = obj.ConvertPSD(total);
             signal = obj.ConvertPSD(signal);
             noise = obj.ConvertPSD(noise);
+            sideband = obj.ConvertPSD((thermal + signal_chi)*0.5*(obj.laser.Pac_sideband/obj.laser.Pdc)^2 + Qnoi);
+            signal_chi = obj.ConvertPSD(signal_chi);
+            thermal = obj.ConvertPSD(thermal);
         end
         
         function A = CoefA(obj, dx, theta)
@@ -98,13 +123,59 @@ classdef OLExperiment < handle
         end
         
         function DC = DC_CM(obj, dx, theta)
-            DC = obj.CoefA(dx, theta)*obj.laser.Pdc -...
+            DC = obj.CoefA(dx, theta)*obj.laser.Pdc +...
                 obj.CoefB(dx, theta)*(obj.laser.Pac)^2*(obj.device.response(-obj.f)+obj.device.response(obj.f))/4;
+            DC = DC*obj.PD.WtoA*(obj.PD.Gain*1e3);
         end
         
         function re = twoOmega(obj, dx, theta)
             re = obj.laser.Pac^2/4*obj.CoefB(dx, theta)*obj.device.response(-obj.f);
             re = abs(re).^2;
+        end
+        
+        function [total, signal, noise, thermal, Qnoi, ref] = AOM_omega(obj, theta, DeltaX0)
+            F0002 = obj.CalFmn(obj.sp.offset, obj.sp.d, 0, 2);
+            F0102 = obj.CalFmn(obj.sp.offset, obj.sp.d, 1, 2);
+            re0 = (sqrt(2*pi)*DeltaX0/obj.w0*cos(theta) + sqrt(2*pi)*obj.laser.k*(obj.device.kmx())^2*DeltaX0*obj.w0*obj.laser.Pdc/obj.consts.c*obj.device.response(obj.f)*sin(theta))*obj.F1;
+            re = (sqrt(2*pi)*DeltaX0/obj.w0*cos(theta) + sqrt(2*pi)*obj.laser.k*(obj.device.kmx())^2*DeltaX0*obj.w0*obj.laser.Pdc/obj.consts.c*obj.device.response(obj.f)*sin(theta))*obj.F1+...
+                (2*sqrt(2)*cos(2*theta)*F0002 + sqrt(2)*sin(theta)*F0102 - sin(theta)*obj.F1)*sqrt(2*pi)*obj.laser.k*(obj.device.kmx())^2*DeltaX0^3*obj.laser.Pdc/(2*obj.w0*obj.consts.c)*(obj.device.response(-obj.f)/2+obj.device.response(obj.f));
+            ref = sqrt(2*pi)*DeltaX0/obj.w0*cos(theta)*obj.F1 + obj.f - obj.f;
+            re = abs(re).^2;
+            re0 = abs(re0).^2;
+            ref = abs(ref).^2;
+            signal = re*obj.laser.Pdc^2/(4*obj.laser.deltaf);
+            ref = ref*obj.laser.Pdc^2/(4*obj.laser.deltaf);
+            thermal = obj.thermal(theta)*obj.laser.Pdc^2;
+            Qnoi = obj.Qnoi(theta);
+            noise = thermal + Qnoi;
+            total = signal + noise;
+        end
+        
+        function [total, signal, noise, thermal, Qnoi, ref] = GetPSDs_AOM(obj, theta, DeltaX0, pw)
+            %[total, signal, noise, thermal, Qnoi, ref] = obj.AOM_omega(theta, DeltaX0);
+            [total, signal, noise, thermal, Qnoi, ref] = obj.AOM_omega_aw(theta, DeltaX0, pw);
+            total = obj.ConvertPSD(total);
+            signal = obj.ConvertPSD(signal);
+            ref = obj.ConvertPSD(ref);
+            noise = obj.ConvertPSD(noise);
+            thermal = obj.ConvertPSD(thermal);
+            Qnoi = obj.ConvertPSD(Qnoi);
+        end
+        
+        function [total, signal, noise, thermal, Qnoi, ref] = AOM_omega_aw(obj, theta, DeltaX0, pw)
+            F0002 = obj.CalFmn(obj.sp.offset, obj.sp.d, 0, 2);
+            F0102 = obj.CalFmn(obj.sp.offset, obj.sp.d, 1, 2);
+            re = (sqrt(2*pi)*DeltaX0/obj.w0*cos(theta) + sqrt(2*pi)*obj.laser.k*(obj.device.kmx())^2*DeltaX0*obj.w0.*pw/obj.consts.c*obj.device.response(obj.f)*sin(theta))*obj.F1+...
+                (2*sqrt(2)*cos(2*theta)*F0002 + sqrt(2)*sin(theta)*F0102 - sin(theta)*obj.F1)*sqrt(2*pi)*obj.laser.k*(obj.device.kmx())^2*DeltaX0^3*obj.laser.Pdc/(2*obj.w0*obj.consts.c)*(obj.device.response(-obj.f)/2+obj.device.response(obj.f));
+            ref = sqrt(2*pi)*DeltaX0/obj.w0*cos(theta)*obj.F1 + obj.f - obj.f;
+            re = abs(re).^2;
+            ref = abs(ref).^2;
+            signal = re.*pw.^2/(4*obj.laser.deltaf);
+            ref = ref*obj.laser.Pdc^2/(4*obj.laser.deltaf);
+            thermal = obj.thermal(theta)*obj.laser.Pdc^2;
+            Qnoi = obj.Qnoi(theta);
+            noise = thermal + Qnoi;
+            total = signal + noise;
         end
     end
 end

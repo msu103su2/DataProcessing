@@ -1,4 +1,4 @@
-Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\39-SNR\';
+Directory = 'Z:\data\optical lever project\NORCADA_NX53515C\53-SNR\';
 
 PSDFlienameRegx = 'PSD_GS=*_count=*.bin';
 PSDFilelist = dir([Directory,PSDFlienameRegx]);

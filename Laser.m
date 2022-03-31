@@ -7,6 +7,7 @@ classdef Laser < handle
         omega;
         Pac;
         deltaf;
+        Pac_sideband;
     end
     
     methods
@@ -16,6 +17,7 @@ classdef Laser < handle
             obj.k = 2*pi/lambda;
             obj.f = temp.c/lambda;
             obj.omega = 2*pi*obj.f;
+            obj.Pac_sideband = 0;
         end
         
         function SetPdc(obj, Pdc)

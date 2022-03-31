@@ -10,7 +10,7 @@ classdef SplitPair < handle
         end
         
         function result = Fweight(obj, x, y)
-            result = heaviside(x - obj.offset - obj.d/2) - heaviside(-(x - obj.offset + obj.d/2));
+            result = -(heaviside(x - obj.offset - obj.d/2) - heaviside(-(x - obj.offset + obj.d/2)));
         end
         
         function result = F_onlyx(obj, HGBeam)

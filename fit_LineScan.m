@@ -1,6 +1,6 @@
 function re = fit_LineScan(step, power, m, n, a, b)
     f = @(stepSize, x0, k, s, A, x) fitFunc(x, stepSize, x0, k, s, A, m, n, a, b);
-    re = fit(step, power, fittype(f), 'StartPoint', [0.8e-7, -5e-6, 0, b/2, 57], 'Lower', [50e-9, -a, -0.1, 0, 0], 'Upper', [1e-3, a, 0.1, b, 240]);
+    re = fit(step, power, fittype(f), 'StartPoint', [0.75e-7, -130e-6, 0, b/2, 231.5], 'Lower', [0.5e-7, -a, -0.1, 0, 0], 'Upper', [1e-7, a, 0.1, b, 240]);
     plot(step, re(step), step, power, '*');
 end
 
